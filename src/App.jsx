@@ -352,9 +352,14 @@ export default function App() {
     const name = `New folder ${siblingCount + 1}`;
 
     try {
-      const folder = isFirebaseConfigured
-        ? await createLibraryFolder({ subjectId, name, parentId })
-        : { id: makeId(`${subjectId}-folder`), name, parentId };
+      if (!isFirebaseConfigured) {
+        const folder = { id: makeId(`${subjectId}-folder`), name, parentId };
+        setCustomFolders((existing) => addItemsToSubject(existing, subjectId, [folder]));
+        setFirebaseError("Cloud sync is not configured in this deployment. Add Firebase and Supabase environment variables in Vercel, then redeploy.");
+        return folder.id;
+      }
+
+      const folder = await createLibraryFolder({ subjectId, name, parentId });
       setCustomFolders((existing) => addItemsToSubject(existing, subjectId, [folder]));
       setFirebaseError("");
       return folder.id;
@@ -394,9 +399,14 @@ export default function App() {
     if (!selectedFiles.length) return;
 
     try {
-      const nextFiles = isFirebaseConfigured
-        ? await Promise.all(selectedFiles.map((file) => uploadLibraryFile({ subjectId, folderId, file })))
-        : selectedFiles.map((file) => getLocalFileRecord(subjectId, folderId, file));
+      if (!isFirebaseConfigured) {
+        const nextFiles = selectedFiles.map((file) => getLocalFileRecord(subjectId, folderId, file));
+        setCustomFiles((existing) => addItemsToSubject(existing, subjectId, nextFiles));
+        setFirebaseError("Cloud sync is not configured in this deployment. Files were added locally only and will disappear after refresh.");
+        return;
+      }
+
+      const nextFiles = await Promise.all(selectedFiles.map((file) => uploadLibraryFile({ subjectId, folderId, file })));
       setCustomFiles((existing) => addItemsToSubject(existing, subjectId, nextFiles));
       setFirebaseError("");
     } catch (error) {

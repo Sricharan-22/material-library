@@ -15,7 +15,6 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
     firebaseConfig.authDomain &&
     firebaseConfig.projectId &&
-    firebaseConfig.storageBucket &&
     firebaseConfig.messagingSenderId &&
     firebaseConfig.appId,
 );
