@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.vite/
+.env
+.env.local
+npm-debug.log*
+.DS_Store
+.chrome-profile/
+.agents/
+tmp/
+outputs/
+dev-*.log
+dev-*.err
