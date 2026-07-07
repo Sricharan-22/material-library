@@ -43,6 +43,10 @@ VITE_SUPABASE_STORAGE_BUCKET=lekha-library-files
 
 For hosting, add the same variables in the hosting provider dashboard.
 
+In Supabase Storage, create a bucket with the exact name from `VITE_SUPABASE_STORAGE_BUCKET`.
+Uploaded files are opened with signed URLs, so the bucket may stay private. If you choose to
+use public object URLs elsewhere, the bucket must be marked public in Supabase.
+
 ## Deployment
 
 Recommended free path:

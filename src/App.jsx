@@ -32,6 +32,7 @@ import {
   createLibraryFolder,
   deleteLibraryFile,
   deleteLibraryFolder,
+  getLibraryFileUrl,
   loadLibraryResources,
   renameLibraryFolder,
   uploadLibraryFile,
@@ -1280,10 +1281,19 @@ function FolderRow({
 function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
   const url = file.downloadUrl || file.localUrl || resourceUrl(file.fileName);
   const isPresentation = ["PPT", "PPTX"].includes(file.type);
-  const openFile = (event) => {
+  const openFile = async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const absoluteUrl = file.localUrl || new URL(url, window.location.href).href;
+
+    let accessUrl;
+    try {
+      accessUrl = await getLibraryFileUrl(file, url);
+    } catch (error) {
+      window.alert(error.message);
+      return;
+    }
+
+    const absoluteUrl = file.localUrl || new URL(accessUrl, window.location.href).href;
 
     if (isPresentation && !file.localUrl) {
       const isLocalPreview = ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -1295,7 +1305,7 @@ function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
       return;
     }
 
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(accessUrl, "_blank", "noopener,noreferrer");
   };
   const confirmDelete = (event) => {
     event.preventDefault();
@@ -1339,11 +1349,20 @@ function DownloadLink({ file, url }) {
   return (
     <button
       className="action-chip"
-      onClick={(event) => {
+      onClick={async (event) => {
         event.preventDefault();
         event.stopPropagation();
+
+        let accessUrl;
+        try {
+          accessUrl = await getLibraryFileUrl(file, url);
+        } catch (error) {
+          window.alert(error.message);
+          return;
+        }
+
         const link = document.createElement("a");
-        link.href = url;
+        link.href = accessUrl;
         link.download = file.fileName;
         link.click();
       }}

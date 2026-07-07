@@ -25,6 +25,14 @@ function ensureSupabase() {
   }
 }
 
+function getStorageErrorMessage(error, bucketName) {
+  const message = error?.message || "Supabase Storage request failed.";
+  if (message.toLowerCase().includes("bucket not found")) {
+    return `Supabase bucket "${bucketName}" was not found. Create that bucket in the Supabase project from VITE_SUPABASE_URL, or update VITE_SUPABASE_STORAGE_BUCKET to the exact bucket name.`;
+  }
+  return message;
+}
+
 function cleanParentId(parentId) {
   return parentId || null;
 }
@@ -88,7 +96,9 @@ export async function uploadLibraryFile({ subjectId, folderId, file }) {
     cacheControl: "3600",
     upsert: false,
   });
-  if (uploadError) throw uploadError;
+  if (uploadError) {
+    throw new Error(getStorageErrorMessage(uploadError, supabaseBucket));
+  }
 
   const { data } = supabase.storage.from(supabaseBucket).getPublicUrl(storagePath);
 
@@ -113,6 +123,21 @@ export async function uploadLibraryFile({ subjectId, folderId, file }) {
     source: "firebase",
     ...record,
   };
+}
+
+export async function getLibraryFileUrl(file, fallbackUrl) {
+  if (!file.storagePath) {
+    return fallbackUrl || file.downloadUrl || file.localUrl || "";
+  }
+
+  ensureSupabase();
+  const bucketName = file.storageBucket || supabaseBucket;
+  const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(file.storagePath, 60 * 60);
+  if (error) {
+    throw new Error(getStorageErrorMessage(error, bucketName));
+  }
+
+  return data.signedUrl;
 }
 
 export async function deleteLibraryFolder(folderId) {
