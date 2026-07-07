@@ -1346,28 +1346,34 @@ function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
 }
 
 function DownloadLink({ file, url }) {
+  const downloadFile = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    let accessUrl;
+    try {
+      accessUrl = await getLibraryFileUrl(file, url, { download: true });
+      const response = await fetch(accessUrl);
+      if (!response.ok) {
+        throw new Error("The file could not be downloaded.");
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = file.fileName || file.title || "download";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (error) {
+      window.alert(error.message);
+    }
+  };
+
   return (
-    <button
-      className="action-chip"
-      onClick={async (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        let accessUrl;
-        try {
-          accessUrl = await getLibraryFileUrl(file, url);
-        } catch (error) {
-          window.alert(error.message);
-          return;
-        }
-
-        const link = document.createElement("a");
-        link.href = accessUrl;
-        link.download = file.fileName;
-        link.click();
-      }}
-      type="button"
-    >
+    <button className="action-chip" onClick={downloadFile} type="button">
       <Download size={14} />
       Download
     </button>

@@ -125,14 +125,15 @@ export async function uploadLibraryFile({ subjectId, folderId, file }) {
   };
 }
 
-export async function getLibraryFileUrl(file, fallbackUrl) {
+export async function getLibraryFileUrl(file, fallbackUrl, options = {}) {
   if (!file.storagePath) {
     return fallbackUrl || file.downloadUrl || file.localUrl || "";
   }
 
   ensureSupabase();
   const bucketName = file.storageBucket || supabaseBucket;
-  const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(file.storagePath, 60 * 60);
+  const signedUrlOptions = options.download ? { download: file.fileName || true } : undefined;
+  const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(file.storagePath, 60 * 60, signedUrlOptions);
   if (error) {
     throw new Error(getStorageErrorMessage(error, bucketName));
   }
