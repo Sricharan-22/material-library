@@ -119,6 +119,8 @@ const baseSubjects = [
   { id: "mm", title: "MM", description: "Workspace prepared for Materia Medica resources.", files: [], folders: [] },
   { id: "gyn-obs-1", title: "Gynecology and Obstetrics-1", description: "Workspace prepared for first paper resources.", files: [], folders: [] },
   { id: "gyn-obs-2", title: "Gynecology and Obstetrics-2", description: "Workspace prepared for second paper resources.", files: [], folders: [] },
+  { id: "community-medicine", title: "Community Medicine", description: "Workspace prepared for Community Medicine resources.", files: [], folders: [] },
+  { id: "repertory", title: "Repertory", description: "Workspace prepared for Repertory resources.", files: [], folders: [] },
 ];
 
 function resourceUrl(fileName) {
