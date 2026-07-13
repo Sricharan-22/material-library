@@ -93,6 +93,14 @@ export async function renameLibraryFolder(folderId, name) {
   });
 }
 
+export async function moveLibraryFile(fileId, folderId) {
+  ensureFirebase();
+  await updateDoc(doc(db, filesCollection, fileId), {
+    folderId: cleanParentId(folderId),
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function uploadLibraryFile({ subjectId, folderId, file }) {
   ensureFirebase();
   ensureSupabase();

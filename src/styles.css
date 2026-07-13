@@ -1404,6 +1404,40 @@ a {
   color: var(--ink);
 }
 
+.move-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border-radius: 5px;
+  color: var(--muted);
+  padding: 3px 5px 3px 7px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.move-select:hover,
+.move-select:focus-within {
+  background: #ebe8e1;
+  color: var(--ink);
+}
+
+.move-select select {
+  max-width: 220px;
+  min-height: 24px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.move-select select:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+  opacity: 0.6;
+}
+
 .action-chip.danger {
   color: var(--danger);
 }

@@ -36,6 +36,7 @@ import {
   deleteLibraryFolder,
   getLibraryFileUrl,
   loadLibraryResources,
+  moveLibraryFile,
   renameLibraryFolder,
   uploadLibraryFile,
 } from "./lib/libraryStore";
@@ -534,6 +535,33 @@ export default function App() {
     }));
   };
 
+  const moveFile = async (subjectId, fileId, targetFolderId) => {
+    const nextFolderId = targetFolderId || null;
+    const file = [
+      ...subjects.flatMap((subject) => subject.files),
+      ...standaloneWorkspaces.flatMap((workspace) => workspace.files),
+    ].find((item) => item.id === fileId);
+    if (!file || file.folderId === nextFolderId) return;
+
+    if (file.source === "firebase") {
+      try {
+        await moveLibraryFile(fileId, nextFolderId);
+        setFirebaseError("");
+      } catch (error) {
+        setFirebaseError(error.message || "Firebase move failed. The file stayed in its current folder.");
+        return;
+      }
+    } else if (!file.localUrl) {
+      setFirebaseError("Only uploaded files can be moved. Built-in resource files stay in their original folders.");
+      return;
+    }
+
+    setCustomFiles((existing) => ({
+      ...existing,
+      [subjectId]: (existing[subjectId] || []).map((item) => (item.id === fileId ? { ...item, folderId: nextFolderId } : item)),
+    }));
+  };
+
   if (!session) {
     return <LoginScreen account={account} onLogin={handleLogin} />;
   }
@@ -591,6 +619,7 @@ export default function App() {
             onRenameFolder={renameFolder}
             onDeleteFolder={(folderId) => deleteFolder(activeWorkspace.id, folderId)}
             onDeleteFile={(fileId) => deleteFile(activeWorkspace.id, fileId)}
+            onMoveFile={(fileId, folderId) => moveFile(activeWorkspace.id, fileId, folderId)}
             onBackDashboard={isStandaloneWorkspaceId(activeWorkspace.id) ? showDashboard : showSubjects}
             onGoRoot={() => openFolder(activeWorkspace.id, null)}
             onGoFolder={(folderId) => openFolder(activeWorkspace.id, folderId)}
@@ -1148,6 +1177,7 @@ function SubjectWorkspace({
   onRenameFolder,
   onDeleteFolder,
   onDeleteFile,
+  onMoveFile,
   onBackDashboard,
   onGoRoot,
   onGoFolder,
@@ -1294,9 +1324,12 @@ function SubjectWorkspace({
         {files.map((file) => (
           <FileAccordionItem
             file={file}
+            folders={subject.folders}
             isOpen={openItemId === file.id}
             onToggle={() => setOpenItemId((current) => (current === file.id ? null : file.id))}
             onDelete={() => onDeleteFile(file.id)}
+            onMove={(folderId) => onMoveFile(file.id, folderId)}
+            subjectTitle={subject.title}
             key={file.id}
           />
         ))}
@@ -1378,12 +1411,14 @@ function FolderRow({
   );
 }
 
-function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
+function FileAccordionItem({ file, folders, isOpen, onToggle, onDelete, onMove, subjectTitle }) {
   const url = file.downloadUrl || file.localUrl || resourceUrl(file.fileName);
   const isPresentation = ["PPT", "PPTX"].includes(file.type);
   const fileType = file.type?.toUpperCase();
   const isImage = ["PNG", "JPG", "JPEG", "WEBP", "GIF", "SVG", "BMP", "HEIC", "HEIF"].includes(fileType);
   const isVideo = ["MP4", "MOV", "WEBM", "AVI", "MKV", "M4V"].includes(fileType);
+  const canMove = file.source === "firebase" || Boolean(file.localUrl);
+  const destinationOptions = getMoveDestinations(folders, subjectTitle);
   const openFile = async (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1437,6 +1472,24 @@ function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
               Open file
             </button>
             <DownloadLink file={file} url={url} />
+            <label className="move-select">
+              <Folder size={14} />
+              <span>Move to</span>
+              <select
+                value={file.folderId || ""}
+                disabled={!canMove}
+                onChange={(event) => {
+                  onMove(event.target.value || null);
+                }}
+                title={canMove ? "Move this uploaded file" : "Built-in resources cannot be moved"}
+              >
+                {destinationOptions.map((folder) => (
+                  <option value={folder.id || ""} key={folder.id || "root"}>
+                    {folder.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="action-chip danger" onClick={confirmDelete} type="button">
               <Trash2 size={14} />
               Delete
@@ -1501,6 +1554,19 @@ function getFolderPath(folders, folderId) {
     current = folders.find((folder) => folder.id === current.parentId);
   }
   return path;
+}
+
+function getMoveDestinations(folders, subjectTitle) {
+  const root = [{ id: null, label: `${subjectTitle} root` }];
+  const nestedFolders = folders
+    .map((folder) => ({
+      id: folder.id,
+      label: getFolderPath(folders, folder.id)
+        .map((item) => item.name)
+        .join(" / "),
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+  return [...root, ...nestedFolders];
 }
 
 function countFolderItems(subject, folderId) {
