@@ -49,6 +49,14 @@ const DEFAULT_ACCOUNT = {
   profileImage: "",
 };
 
+const MATERIALS_WORKSPACE_ID = "materials";
+const NOTES_WORKSPACE_ID = "sanjanaka-notes";
+const NOTES_WORKSPACE_TITLE = "sanjana'ka-notes";
+
+function isStandaloneWorkspaceId(id) {
+  return id === MATERIALS_WORKSPACE_ID || id === NOTES_WORKSPACE_ID;
+}
+
 const examTimetable = [
   { day: "Monday", date: "20-07-2026", time: "9.30 am to 12.30 pm", paper: "I", subject: "Homoeopathic Materia Medica", code: "581641" },
   { day: "Tuesday", date: "21-07-2026", time: "9.30 am to 12.30 pm", paper: "II", subject: "Organon of Medicine and Homoeopathic Philosophy - I", code: "581642" },
@@ -244,25 +252,48 @@ export default function App() {
 
   const activeSubject = activeSubjectId ? subjects.find((subject) => subject.id === activeSubjectId) : null;
   const materialsSubject = useMemo(() => {
-    const folders = (customFolders.materials || [])
+    const folders = (customFolders[MATERIALS_WORKSPACE_ID] || [])
       .filter((folder) => !deletedFolderIds.includes(folder.id))
       .map((folder) => ({
         ...folder,
         name: folderRenames[folder.id] || folder.name,
       }));
-    const files = (customFiles.materials || []).filter(
+    const files = (customFiles[MATERIALS_WORKSPACE_ID] || []).filter(
       (file) => !deletedFileIds.includes(file.id) && !deletedFolderIds.includes(file.folderId),
     );
 
     return {
-      id: "materials",
+      id: MATERIALS_WORKSPACE_ID,
       title: "Materials",
       description: "Save random study materials, notes, PDFs, PPTs, and reference files here.",
       files,
       folders,
     };
   }, [customFiles, customFolders, deletedFileIds, deletedFolderIds, folderRenames]);
-  const activeWorkspace = activeSubject || (activeView === "materials" ? materialsSubject : null);
+
+  const notesSubject = useMemo(() => {
+    const folders = (customFolders[NOTES_WORKSPACE_ID] || [])
+      .filter((folder) => !deletedFolderIds.includes(folder.id))
+      .map((folder) => ({
+        ...folder,
+        name: folderRenames[folder.id] || folder.name,
+      }));
+    const files = (customFiles[NOTES_WORKSPACE_ID] || []).filter(
+      (file) => !deletedFileIds.includes(file.id) && !deletedFolderIds.includes(file.folderId),
+    );
+
+    return {
+      id: NOTES_WORKSPACE_ID,
+      title: NOTES_WORKSPACE_TITLE,
+      description: "Save Sanjana'ka notes, PDFs, PPTs, images, and extra study materials here.",
+      files,
+      folders,
+    };
+  }, [customFiles, customFolders, deletedFileIds, deletedFolderIds, folderRenames]);
+
+  const standaloneWorkspaces = useMemo(() => [materialsSubject, notesSubject], [materialsSubject, notesSubject]);
+  const activeWorkspace =
+    activeSubject || (activeView === "materials" ? materialsSubject : activeView === "notes" ? notesSubject : null);
   const currentFolderId = activeWorkspace ? currentFolderBySubject[activeWorkspace.id] || null : null;
   const readyPpts = subjects.reduce((total, subject) => total + subject.files.length, 0);
   const activeFolders = subjects.filter((subject) => subject.files.length || subject.folders.length).length;
@@ -325,7 +356,17 @@ export default function App() {
   const showMaterials = () => {
     setActiveView("materials");
     setActiveSubjectId(null);
-    setCurrentFolderBySubject((existing) => ({ ...existing, materials: existing.materials || null }));
+    setCurrentFolderBySubject((existing) => ({
+      ...existing,
+      [MATERIALS_WORKSPACE_ID]: existing[MATERIALS_WORKSPACE_ID] || null,
+    }));
+    setSidebarOpen(false);
+  };
+
+  const showNotes = () => {
+    setActiveView("notes");
+    setActiveSubjectId(null);
+    setCurrentFolderBySubject((existing) => ({ ...existing, [NOTES_WORKSPACE_ID]: existing[NOTES_WORKSPACE_ID] || null }));
     setSidebarOpen(false);
   };
 
@@ -350,7 +391,7 @@ export default function App() {
   };
 
   const addFolder = async (subjectId, parentId) => {
-    const workspace = subjectId === "materials" ? materialsSubject : subjects.find((subject) => subject.id === subjectId);
+    const workspace = standaloneWorkspaces.find((item) => item.id === subjectId) || subjects.find((subject) => subject.id === subjectId);
     const siblingCount = (workspace?.folders || []).filter((folder) => folder.parentId === parentId).length;
     const name = `New folder ${siblingCount + 1}`;
 
@@ -377,7 +418,10 @@ export default function App() {
   const renameFolder = async (folderId, name) => {
     const nextName = name.trim();
     if (!nextName) return;
-    const folder = [...subjects.flatMap((subject) => subject.folders), ...materialsSubject.folders].find((item) => item.id === folderId);
+    const folder = [
+      ...subjects.flatMap((subject) => subject.folders),
+      ...standaloneWorkspaces.flatMap((workspace) => workspace.folders),
+    ].find((item) => item.id === folderId);
     if (folder?.source === "firebase") {
       try {
         await renameLibraryFolder(folderId, nextName);
@@ -420,7 +464,7 @@ export default function App() {
   };
 
   const deleteFolder = async (subjectId, folderId) => {
-    const subject = subjectId === "materials" ? materialsSubject : subjects.find((item) => item.id === subjectId);
+    const subject = standaloneWorkspaces.find((item) => item.id === subjectId) || subjects.find((item) => item.id === subjectId);
     if (!subject) return;
 
     const folderIds = collectDescendantFolderIds(subject.folders, folderId);
@@ -462,7 +506,10 @@ export default function App() {
   };
 
   const deleteFile = async (subjectId, fileId) => {
-    const file = [...subjects.flatMap((subject) => subject.files), ...materialsSubject.files].find((item) => item.id === fileId);
+    const file = [
+      ...subjects.flatMap((subject) => subject.files),
+      ...standaloneWorkspaces.flatMap((workspace) => workspace.files),
+    ].find((item) => item.id === fileId);
     if (file?.source === "firebase") {
       try {
         await deleteLibraryFile(file);
@@ -494,11 +541,13 @@ export default function App() {
         onDashboard={showDashboard}
         onFolderSelect={selectFolder}
         onMaterials={showMaterials}
+        onNotes={showNotes}
         onSubjectSelect={selectSubject}
         onSubjects={showSubjects}
         account={account}
         isProfileOpen={profileOpen}
         materialsSubject={materialsSubject}
+        notesSubject={notesSubject}
         onOpenProfile={openProfileSettings}
         session={session}
         subjects={subjects}
@@ -533,7 +582,7 @@ export default function App() {
             onRenameFolder={renameFolder}
             onDeleteFolder={(folderId) => deleteFolder(activeWorkspace.id, folderId)}
             onDeleteFile={(fileId) => deleteFile(activeWorkspace.id, fileId)}
-            onBackDashboard={activeWorkspace.id === "materials" ? showDashboard : showSubjects}
+            onBackDashboard={isStandaloneWorkspaceId(activeWorkspace.id) ? showDashboard : showSubjects}
             onGoRoot={() => openFolder(activeWorkspace.id, null)}
             onGoFolder={(folderId) => openFolder(activeWorkspace.id, folderId)}
           />
@@ -636,16 +685,18 @@ function Sidebar({
   onDashboard,
   onFolderSelect,
   onMaterials,
+  onNotes,
   onSubjectSelect,
   onSubjects,
   isProfileOpen,
   materialsSubject,
+  notesSubject,
   onOpenProfile,
   session,
   subjects,
   onLogout,
 }) {
-  const activeTree = activeSubject || (activeView === "materials" ? materialsSubject : null);
+  const activeTree = activeSubject || (activeView === "materials" ? materialsSubject : activeView === "notes" ? notesSubject : null);
   const rootFolders = activeTree?.folders.filter((folder) => folder.parentId === null) || [];
   const childFolders = activeTree?.folders.filter((folder) => folder.parentId === currentFolderId && folder.parentId !== null) || [];
 
@@ -688,9 +739,9 @@ function Sidebar({
             <Box size={17} />
             <span>Materials</span>
           </button>
-          <button className="nav-item muted" type="button">
-            <Clock3 size={17} />
-            <span>Recent files</span>
+          <button className={`nav-item ${activeView === "notes" ? "active" : ""}`} onClick={onNotes} type="button">
+            <ClipboardList size={17} />
+            <span>{NOTES_WORKSPACE_TITLE}</span>
           </button>
         </nav>
 
@@ -707,9 +758,15 @@ function Sidebar({
           </div>
         ) : (
           <div className="subject-list">
-            <p>{activeTree.id === "materials" ? "Materials" : "Subject"}</p>
+            <p>{isStandaloneWorkspaceId(activeTree.id) ? activeTree.title : "Subject"}</p>
             <button className="subject-tab active" onClick={() => onFolderSelect(null)}>
-              {activeTree.id === "materials" ? <Box size={16} /> : <BookOpen size={16} />}
+              {activeTree.id === MATERIALS_WORKSPACE_ID ? (
+                <Box size={16} />
+              ) : activeTree.id === NOTES_WORKSPACE_ID ? (
+                <ClipboardList size={16} />
+              ) : (
+                <BookOpen size={16} />
+              )}
               <span>{activeTree.title}</span>
               <small>{activeTree.files.length}</small>
             </button>
@@ -905,7 +962,15 @@ function ProfileSettings({ account, onClose, onUpdateAccount }) {
 }
 
 function TopBar({ activeSubject, activeView, currentFolder, query, setQuery, onDashboard, onToggleSidebar }) {
-  const pageTitle = activeSubject?.title || (activeView === "subjects" ? "Subjects" : activeView === "materials" ? "Materials" : "");
+  const pageTitle =
+    activeSubject?.title ||
+    (activeView === "subjects"
+      ? "Subjects"
+      : activeView === "materials"
+        ? "Materials"
+        : activeView === "notes"
+          ? NOTES_WORKSPACE_TITLE
+          : "");
 
   return (
     <header className="topbar">
@@ -1086,7 +1151,7 @@ function SubjectWorkspace({
   const currentFolder = subject.folders.find((folder) => folder.id === currentFolderId) || null;
   const path = getFolderPath(subject.folders, currentFolderId);
   const backTargetFolderId = currentFolder ? currentFolder.parentId : null;
-  const rootBackLabel = subject.id === "materials" ? "Back to dashboard" : "Back to subjects";
+  const rootBackLabel = isStandaloneWorkspaceId(subject.id) ? "Back to dashboard" : "Back to subjects";
   const backLabel = currentFolder ? `Back to ${backTargetFolderId ? path[path.length - 2]?.name || subject.title : subject.title}` : rootBackLabel;
 
   const childFolders = subject.folders
@@ -1119,7 +1184,15 @@ function SubjectWorkspace({
       <div className="page-title-row">
         <div>
           <div className="page-icon">
-            {currentFolder ? <Folder size={34} /> : subject.id === "materials" ? <Box size={34} /> : <BookOpen size={34} />}
+            {currentFolder ? (
+              <Folder size={34} />
+            ) : subject.id === MATERIALS_WORKSPACE_ID ? (
+              <Box size={34} />
+            ) : subject.id === NOTES_WORKSPACE_ID ? (
+              <ClipboardList size={34} />
+            ) : (
+              <BookOpen size={34} />
+            )}
           </div>
           <h1>{currentFolder ? currentFolder.name : subject.title}</h1>
           <p>{currentFolder ? `Inside ${subject.title}. Create folders and add files here.` : subject.description}</p>
