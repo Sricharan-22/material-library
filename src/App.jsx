@@ -16,6 +16,7 @@ import {
   Folder,
   FolderPlus,
   Home,
+  Image as ImageIcon,
   Library,
   LockKeyhole,
   LogOut,
@@ -25,6 +26,7 @@ import {
   Search,
   Trash2,
   User,
+  Video,
   X,
 } from "lucide-react";
 import { isFirebaseConfigured } from "./lib/firebase";
@@ -166,11 +168,18 @@ function addItemsToSubject(existing, subjectId, items) {
   };
 }
 
+function getUploadKind(file) {
+  if (file.type?.startsWith("image/")) return "Image";
+  if (file.type?.startsWith("video/")) return "Video";
+  return "File";
+}
+
 function getLocalFileRecord(subjectId, folderId, file) {
+  const uploadKind = getUploadKind(file);
   return {
     id: makeId(`${subjectId}-file`),
     title: file.name.replace(/\.[^.]+$/, ""),
-    description: "Added in this browser session. Firebase save failed or is not configured.",
+    description: `${uploadKind} added in this browser session. Firebase save failed or is not configured.`,
     period: "New",
     type: file.name.split(".").pop()?.toUpperCase() || "FILE",
     folderId,
@@ -1144,6 +1153,7 @@ function SubjectWorkspace({
   onGoFolder,
 }) {
   const fileInputRef = useRef(null);
+  const mediaInputRef = useRef(null);
   const [renamingFolderId, setRenamingFolderId] = useState(null);
   const [openItemId, setOpenItemId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
@@ -1221,14 +1231,29 @@ function SubjectWorkspace({
           </button>
         </div>
         <div className="workspace-actions">
-          <button className="ghost-btn" onClick={onAddFolder}>
+          <button className="ghost-btn" onClick={onAddFolder} type="button">
             <FolderPlus size={16} />
             New folder
           </button>
-          <button className="primary-btn" onClick={() => fileInputRef.current?.click()}>
+          <button className="ghost-btn" onClick={() => mediaInputRef.current?.click()} type="button">
+            <ImageIcon size={16} />
+            Add media
+          </button>
+          <button className="primary-btn" onClick={() => fileInputRef.current?.click()} type="button">
             <FilePlus2 size={16} />
             Add files
           </button>
+          <input
+            ref={mediaInputRef}
+            className="hidden-input"
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            onChange={(event) => {
+              onAddFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
           <input
             ref={fileInputRef}
             className="hidden-input"
@@ -1356,6 +1381,9 @@ function FolderRow({
 function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
   const url = file.downloadUrl || file.localUrl || resourceUrl(file.fileName);
   const isPresentation = ["PPT", "PPTX"].includes(file.type);
+  const fileType = file.type?.toUpperCase();
+  const isImage = ["PNG", "JPG", "JPEG", "WEBP", "GIF", "SVG", "BMP", "HEIC", "HEIF"].includes(fileType);
+  const isVideo = ["MP4", "MOV", "WEBM", "AVI", "MKV", "M4V"].includes(fileType);
   const openFile = async (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1395,7 +1423,7 @@ function FileAccordionItem({ file, isOpen, onToggle, onDelete }) {
       <button className="accordion-summary" onClick={onToggle} type="button" aria-expanded={isOpen}>
         <ChevronRight className="accordion-chevron" size={16} />
         <span className="accordion-icon file">
-          <Presentation size={18} />
+          {isImage ? <ImageIcon size={18} /> : isVideo ? <Video size={18} /> : <Presentation size={18} />}
         </span>
         <span className="accordion-title">{file.title}</span>
         <span className="accordion-meta">{file.type} | {file.period}</span>

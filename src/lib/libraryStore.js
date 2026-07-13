@@ -37,6 +37,12 @@ function cleanParentId(parentId) {
   return parentId || null;
 }
 
+function getUploadKind(file) {
+  if (file.type?.startsWith("image/")) return "Image";
+  if (file.type?.startsWith("video/")) return "Video";
+  return "File";
+}
+
 export async function loadLibraryResources() {
   ensureFirebase();
   const [folderSnapshot, fileSnapshot] = await Promise.all([
@@ -91,6 +97,7 @@ export async function uploadLibraryFile({ subjectId, folderId, file }) {
   ensureFirebase();
   ensureSupabase();
   const extension = file.name.split(".").pop()?.toUpperCase() || "FILE";
+  const uploadKind = getUploadKind(file);
   const storagePath = `${subjectId}/${Date.now()}-${file.name}`;
   const { error: uploadError } = await supabase.storage.from(supabaseBucket).upload(storagePath, file, {
     cacheControl: "3600",
@@ -106,7 +113,7 @@ export async function uploadLibraryFile({ subjectId, folderId, file }) {
     subjectId,
     folderId: cleanParentId(folderId),
     title: file.name.replace(/\.[^.]+$/, ""),
-    description: "Uploaded to Supabase Storage.",
+    description: `${uploadKind} uploaded to Supabase Storage.`,
     period: "New",
     type: extension,
     fileName: file.name,
